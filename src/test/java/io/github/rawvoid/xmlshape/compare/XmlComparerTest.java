@@ -316,6 +316,14 @@ class XmlComparerTest {
     }
 
     @Test
+    void dateTimeValueEqualityMatchesLocalTimes() {
+        var options = CompareOptions.defaults().withValueEquality(ValueEqualities.dateTime());
+        assertTrue(XmlComparer.compare("<Root>09:30:00</Root>", "<Root>09:30:00</Root>", options).isEqual());
+        assertTrue(XmlComparer.compare("<Root>09:30:00.5</Root>", "<Root>09:30:00.500</Root>", options).isEqual());
+        assertFalse(XmlComparer.compare("<Root>09:30:00</Root>", "<Root>09:30:01</Root>", options).isEqual());
+    }
+
+    @Test
     void dateTimeDoesNotEquateDateAndInstant() {
         var options = CompareOptions.defaults().withValueEquality(ValueEqualities.dateTime());
         var diff = XmlComparer.compare(
@@ -323,6 +331,39 @@ class XmlComparerTest {
                 "<Root>2020-01-01T00:00:00Z</Root>",
                 options);
         assertFalse(diff.isEqual());
+    }
+
+    @Test
+    void dateTimeIgnoreTimeZoneComparesWallClockFields() {
+        var options = CompareOptions.defaults().withValueEquality(ValueEqualities.dateTime(true));
+        // Same local fields, different offsets → equal when zone is ignored
+        assertTrue(XmlComparer.compare(
+                "<Root>2020-01-01T00:00:00Z</Root>",
+                "<Root>2020-01-01T00:00:00+08:00</Root>",
+                options).isEqual());
+        // Zoned date-time vs plain local date-time with same fields
+        assertTrue(XmlComparer.compare(
+                "<Root>2020-01-01T12:30:00Z</Root>",
+                "<Root>2020-01-01T12:30:00</Root>",
+                options).isEqual());
+        // Offset times compared by local time only
+        assertTrue(XmlComparer.compare(
+                "<Root>09:15:00Z</Root>",
+                "<Root>09:15:00+08:00</Root>",
+                options).isEqual());
+        assertTrue(XmlComparer.compare(
+                "<Root>09:15:00+08:00</Root>",
+                "<Root>09:15:00</Root>",
+                options).isEqual());
+    }
+
+    @Test
+    void dateTimeZoneAwareDoesNotEquateDifferentInstantsWithSameLocalFields() {
+        var zoneAware = CompareOptions.defaults().withValueEquality(ValueEqualities.dateTime(false));
+        assertFalse(XmlComparer.compare(
+                "<Root>2020-01-01T00:00:00Z</Root>",
+                "<Root>2020-01-01T00:00:00+08:00</Root>",
+                zoneAware).isEqual());
     }
 
     @Test

@@ -4,7 +4,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Locale;
@@ -58,19 +61,45 @@ public final class ValueEqualities {
     }
 
     /**
-     * Both sides parse as the same temporal kind → equal when the instants/dates match.
+     * Temporal equality with ISO-8601 parsers and zone-aware instants
+     * ({@code ignoreTimeZone=false}). Equivalent to {@link #dateTime(boolean) dateTime(false)}.
      *
-     * <ul>
-     *   <li>{@link Instant} / {@link OffsetDateTime} → compared as {@link Instant}</li>
-     *   <li>both {@link LocalDateTime} → {@link LocalDateTime#equals}</li>
-     *   <li>both {@link LocalDate} → {@link LocalDate#equals}</li>
-     *   <li>mixed kinds (e.g. date vs instant) → empty (no decision)</li>
-     * </ul>
+     * @see #dateTime(boolean)
      */
     public static ValueEquality dateTime() {
+        return dateTime(false);
+    }
+
+    /**
+     * Both sides parse as the same temporal kind (ISO-8601) → equal when values match.
+     *
+     * <p>Parsing tries, in order: {@link OffsetDateTime}, {@link Instant}, {@link LocalDateTime},
+     * {@link LocalDate}, {@link OffsetTime}, {@link LocalTime}.
+     *
+     * <ul>
+     *   <li>{@code ignoreTimeZone=false} (default):
+     *     <ul>
+     *       <li>{@link Instant} / {@link OffsetDateTime} → compared as {@link Instant}</li>
+     *       <li>{@link OffsetTime} → {@link OffsetTime#equals}</li>
+     *       <li>both {@link LocalDateTime} / {@link LocalDate} / {@link LocalTime} → kind equals</li>
+     *     </ul>
+     *   </li>
+     *   <li>{@code ignoreTimeZone=true}:
+     *     <ul>
+     *       <li>zoned date-times ({@link Instant} as UTC, {@link OffsetDateTime}) → local date-time fields only</li>
+     *       <li>zoned times ({@link OffsetTime}) → local time fields only</li>
+     *       <li>then same-kind equals as above</li>
+     *     </ul>
+     *   </li>
+     *   <li>mixed kinds (e.g. date vs date-time, time vs date-time) → empty (no decision)</li>
+     * </ul>
+     *
+     * @param ignoreTimeZone when {@code true}, discard offsets and compare wall-clock fields
+     */
+    public static ValueEquality dateTime(boolean ignoreTimeZone) {
         return (ctx, expected, actual) -> {
-            var left = tryTemporal(expected);
-            var right = tryTemporal(actual);
+            var left = tryTemporal(expected, ignoreTimeZone);
+            var right = tryTemporal(actual, ignoreTimeZone);
             if (left.isEmpty() || right.isEmpty()) {
                 return Optional.empty();
             }
@@ -148,18 +177,33 @@ public final class ValueEqualities {
         };
     }
 
-    private static Optional<TemporalValue> tryTemporal(String raw) {
+    /**
+     * ISO-8601 lexical forms only. {@link OffsetDateTime} is tried before {@link Instant} so that
+     * offset-bearing strings keep their wall-clock fields when {@code ignoreTimeZone} is true
+     * ({@code Instant.parse} would normalize them to UTC first).
+     */
+    private static Optional<TemporalValue> tryTemporal(String raw, boolean ignoreTimeZone) {
         if (raw == null || raw.isBlank()) {
             return Optional.empty();
         }
         String s = raw.trim();
+
         try {
-            return Optional.of(new TemporalValue.InstantValue(Instant.parse(s)));
+            var odt = OffsetDateTime.parse(s);
+            if (ignoreTimeZone) {
+                return Optional.of(new TemporalValue.LocalDateTimeValue(odt.toLocalDateTime()));
+            }
+            return Optional.of(new TemporalValue.InstantValue(odt.toInstant()));
         } catch (DateTimeParseException ignored) {
             // try next
         }
         try {
-            return Optional.of(new TemporalValue.InstantValue(OffsetDateTime.parse(s).toInstant()));
+            var instant = Instant.parse(s);
+            if (ignoreTimeZone) {
+                return Optional.of(new TemporalValue.LocalDateTimeValue(
+                        LocalDateTime.ofInstant(instant, ZoneOffset.UTC)));
+            }
+            return Optional.of(new TemporalValue.InstantValue(instant));
         } catch (DateTimeParseException ignored) {
             // try next
         }
@@ -170,6 +214,20 @@ public final class ValueEqualities {
         }
         try {
             return Optional.of(new TemporalValue.LocalDateValue(LocalDate.parse(s)));
+        } catch (DateTimeParseException ignored) {
+            // try next
+        }
+        try {
+            var ot = OffsetTime.parse(s);
+            if (ignoreTimeZone) {
+                return Optional.of(new TemporalValue.LocalTimeValue(ot.toLocalTime()));
+            }
+            return Optional.of(new TemporalValue.OffsetTimeValue(ot));
+        } catch (DateTimeParseException ignored) {
+            // try next
+        }
+        try {
+            return Optional.of(new TemporalValue.LocalTimeValue(LocalTime.parse(s)));
         } catch (DateTimeParseException ignored) {
             return Optional.empty();
         }
@@ -202,6 +260,26 @@ public final class ValueEqualities {
             @Override
             public Optional<Boolean> equalTo(TemporalValue other) {
                 if (other instanceof LocalDateValue(LocalDate o)) {
+                    return Optional.of(value.equals(o));
+                }
+                return Optional.empty();
+            }
+        }
+
+        record LocalTimeValue(LocalTime value) implements TemporalValue {
+            @Override
+            public Optional<Boolean> equalTo(TemporalValue other) {
+                if (other instanceof LocalTimeValue(LocalTime o)) {
+                    return Optional.of(value.equals(o));
+                }
+                return Optional.empty();
+            }
+        }
+
+        record OffsetTimeValue(OffsetTime value) implements TemporalValue {
+            @Override
+            public Optional<Boolean> equalTo(TemporalValue other) {
+                if (other instanceof OffsetTimeValue(OffsetTime o)) {
                     return Optional.of(value.equals(o));
                 }
                 return Optional.empty();
