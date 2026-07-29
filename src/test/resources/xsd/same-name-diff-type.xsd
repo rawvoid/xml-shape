@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/samename"
+           targetNamespace="http://example.com/samename"
+           elementFormDefault="qualified">
+
+    <xs:element name="Root" type="OuterType"/>
+
+    <xs:complexType name="OuterType">
+        <xs:sequence>
+            <xs:element name="Item" type="InnerType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="InnerType">
+        <xs:sequence>
+            <!-- Same local name as parent particle, different named type -->
+            <xs:element name="Item" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>

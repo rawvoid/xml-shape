@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/numex"
+           targetNamespace="http://example.com/numex"
+           elementFormDefault="qualified">
+
+    <xs:element name="Root">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="OpenUnit" type="OpenUnitType"/>
+                <xs:element name="AtLeastHundred" type="AtLeastHundredType"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:simpleType name="OpenUnitType">
+        <xs:restriction base="xs:decimal">
+            <xs:minExclusive value="0"/>
+            <xs:maxExclusive value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="AtLeastHundredType">
+        <xs:restriction base="xs:integer">
+            <xs:minInclusive value="100"/>
+            <xs:totalDigits value="3"/>
+        </xs:restriction>
+    </xs:simpleType>
+</xs:schema>

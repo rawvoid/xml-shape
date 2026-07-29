@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/subst"
+           targetNamespace="http://example.com/subst"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+    <xs:element name="Root">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="Animal"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="Animal" type="xs:string" abstract="true"/>
+    <xs:element name="Cat" type="xs:string" substitutionGroup="Animal"/>
+    <xs:element name="Dog" type="xs:string" substitutionGroup="Animal"/>
+</xs:schema>

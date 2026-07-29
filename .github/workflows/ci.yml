@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.project-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+          cache: maven
+
+      - name: Run unit tests
+        run: mvn -B test
+
+      - name: Read project version
+        id: project-version
+        run: |
+          version="$(mvn -B help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "project.version=${version}"
+
+  publish-snapshot:
+    name: Publish SNAPSHOT
+    needs: test
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && endsWith(needs.test.outputs.version, '-SNAPSHOT')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+
+      - name: Deploy SNAPSHOT to Central Portal
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        # SNAPSHOT uploads skip GPG (same as jaxb-plugins deploy.yml)
+        run: mvn -B -Ppublish deploy -DskipTests -Dgpg.skip
+
+  publish-release:
+    name: Publish release
+    needs: test
+    if: >-
+      github.event_name == 'push'
+      && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate tag matches non-SNAPSHOT pom version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          # Final releases: v1.0.0
+          # Pre-releases (still published to Maven Central): v1.0.0-alpha, v1.0.0-alpha.1,
+          # v1.0.0-alpha-1, v1.0.0-beta, v1.0.0-rc, v1.0.0-rc.2, …
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)([.-]?[0-9]+)?)?$ ]]; then
+            echo "Tag '${tag}' must match vMAJOR.MINOR.PATCH or a pre-release qualifier"
+            echo "Examples: v1.0.0, v1.0.0-alpha, v1.0.0-alpha.1, v1.0.0-beta, v1.0.0-rc.1"
+            exit 1
+          fi
+          expected="${tag#v}"
+          version="$(mvn -B help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          echo "tag=${tag} expected pom version=${expected} actual=${version}"
+          if [[ "${version}" == *-SNAPSHOT ]]; then
+            echo "Refuse to publish a SNAPSHOT version as a release"
+            exit 1
+          fi
+          if [[ "${version}" != "${expected}" ]]; then
+            echo "pom version (${version}) does not match tag (${expected})"
+            exit 1
+          fi
+          {
+            echo "TAG_NAME=${tag}"
+            echo "PROJECT_VERSION=${version}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Deploy release to Maven Central
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: mvn -B -Ppublish deploy -DskipTests
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.TAG_NAME }}
+          draft: false
+          prerelease: ${{ contains(env.TAG_NAME, 'alpha') || contains(env.TAG_NAME, 'beta') || contains(env.TAG_NAME, 'rc') }}
+          generate_release_notes: true
+          files: |
+            target/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        run: |
+          echo "### Release deployment completed" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Version: **${PROJECT_VERSION}** (tag \`${TAG_NAME}\`)" >> "${GITHUB_STEP_SUMMARY}"

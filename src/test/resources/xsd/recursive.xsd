@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/recursive"
+           targetNamespace="http://example.com/recursive"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+    <xs:element name="Node" type="NodeType"/>
+    <xs:complexType name="NodeType">
+        <xs:sequence>
+            <xs:element name="Label" type="xs:string"/>
+            <xs:element name="Child" type="NodeType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>

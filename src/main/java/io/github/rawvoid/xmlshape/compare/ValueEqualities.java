@@ -1,0 +1,211 @@
+package io.github.rawvoid.xmlshape.compare;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Built-in {@link ValueEquality} strategies. Defaults leave comparison literal; call sites opt in.
+ *
+ * <p>Typed strategies only decide when <em>both</em> sides parse as that type (same temporal kind
+ * for date-time), otherwise they return empty so another strategy or literal equality can apply.
+ */
+public final class ValueEqualities {
+    private ValueEqualities() {
+    }
+
+    /**
+     * Tries strategies in order; the first non-empty result wins.
+     */
+    public static ValueEquality chain(ValueEquality... strategies) {
+        Objects.requireNonNull(strategies, "strategies");
+        var copy = Arrays.copyOf(strategies, strategies.length);
+        for (var s : copy) {
+            Objects.requireNonNull(s, "strategy");
+        }
+        return (ctx, expected, actual) -> {
+            for (var strategy : copy) {
+                var result = strategy.equalTo(ctx, expected, actual);
+                if (result.isPresent()) {
+                    return result;
+                }
+            }
+            return Optional.empty();
+        };
+    }
+
+    /**
+     * Both sides parse as {@link BigDecimal} → numeric equality; otherwise empty.
+     */
+    public static ValueEquality numeric() {
+        return (ctx, expected, actual) -> {
+            var left = tryBigDecimal(expected);
+            var right = tryBigDecimal(actual);
+            if (left.isEmpty() || right.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(left.get().compareTo(right.get()) == 0);
+        };
+    }
+
+    /**
+     * Both sides parse as the same temporal kind → equal when the instants/dates match.
+     *
+     * <ul>
+     *   <li>{@link Instant} / {@link OffsetDateTime} → compared as {@link Instant}</li>
+     *   <li>both {@link LocalDateTime} → {@link LocalDateTime#equals}</li>
+     *   <li>both {@link LocalDate} → {@link LocalDate#equals}</li>
+     *   <li>mixed kinds (e.g. date vs instant) → empty (no decision)</li>
+     * </ul>
+     */
+    public static ValueEquality dateTime() {
+        return (ctx, expected, actual) -> {
+            var left = tryTemporal(expected);
+            var right = tryTemporal(actual);
+            if (left.isEmpty() || right.isEmpty()) {
+                return Optional.empty();
+            }
+            return left.get().equalTo(right.get());
+        };
+    }
+
+    /**
+     * Both sides look like booleans ({@code true}/{@code false}/{@code 1}/{@code 0}, case-insensitive)
+     * → semantic equality; otherwise empty.
+     */
+    public static ValueEquality bool() {
+        return (ctx, expected, actual) -> {
+            var left = tryBoolean(expected);
+            var right = tryBoolean(actual);
+            if (left.isEmpty() || right.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(left.get().equals(right.get()));
+        };
+    }
+
+    /**
+     * Applies {@code inner} only when {@link ValueContext#localName()} is one of {@code localNames}.
+     */
+    public static ValueEquality forLocalNames(ValueEquality inner, String... localNames) {
+        Objects.requireNonNull(inner, "inner");
+        Objects.requireNonNull(localNames, "localNames");
+        Set<String> names = Arrays.stream(localNames)
+                .peek(n -> {
+                    if (n == null || n.isEmpty()) {
+                        throw new IllegalArgumentException("localNames must not contain null/empty");
+                    }
+                })
+                .collect(Collectors.toUnmodifiableSet());
+        if (names.isEmpty()) {
+            throw new IllegalArgumentException("localNames must not be empty");
+        }
+        return (ctx, expected, actual) -> {
+            if (!names.contains(ctx.localName())) {
+                return Optional.empty();
+            }
+            return inner.equalTo(ctx, expected, actual);
+        };
+    }
+
+    /**
+     * Common typed chain: date-time, then numeric, then boolean. Not applied by
+     * {@link CompareOptions#defaults()}; opt in explicitly.
+     */
+    public static ValueEquality commonTypes() {
+        return chain(dateTime(), numeric(), bool());
+    }
+
+    private static Optional<BigDecimal> tryBigDecimal(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(new BigDecimal(raw.trim()));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<Boolean> tryBoolean(String raw) {
+        if (raw == null) {
+            return Optional.empty();
+        }
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+        return switch (s) {
+            case "true", "1" -> Optional.of(true);
+            case "false", "0" -> Optional.of(false);
+            default -> Optional.empty();
+        };
+    }
+
+    private static Optional<TemporalValue> tryTemporal(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        String s = raw.trim();
+        try {
+            return Optional.of(new TemporalValue.InstantValue(Instant.parse(s)));
+        } catch (DateTimeParseException ignored) {
+            // try next
+        }
+        try {
+            return Optional.of(new TemporalValue.InstantValue(OffsetDateTime.parse(s).toInstant()));
+        } catch (DateTimeParseException ignored) {
+            // try next
+        }
+        try {
+            return Optional.of(new TemporalValue.LocalDateTimeValue(LocalDateTime.parse(s)));
+        } catch (DateTimeParseException ignored) {
+            // try next
+        }
+        try {
+            return Optional.of(new TemporalValue.LocalDateValue(LocalDate.parse(s)));
+        } catch (DateTimeParseException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private sealed interface TemporalValue {
+        Optional<Boolean> equalTo(TemporalValue other);
+
+        record InstantValue(Instant instant) implements TemporalValue {
+            @Override
+            public Optional<Boolean> equalTo(TemporalValue other) {
+                if (other instanceof InstantValue(Instant o)) {
+                    return Optional.of(instant.equals(o));
+                }
+                return Optional.empty();
+            }
+        }
+
+        record LocalDateTimeValue(LocalDateTime value) implements TemporalValue {
+            @Override
+            public Optional<Boolean> equalTo(TemporalValue other) {
+                if (other instanceof LocalDateTimeValue(LocalDateTime o)) {
+                    return Optional.of(value.equals(o));
+                }
+                return Optional.empty();
+            }
+        }
+
+        record LocalDateValue(LocalDate value) implements TemporalValue {
+            @Override
+            public Optional<Boolean> equalTo(TemporalValue other) {
+                if (other instanceof LocalDateValue(LocalDate o)) {
+                    return Optional.of(value.equals(o));
+                }
+                return Optional.empty();
+            }
+        }
+    }
+}

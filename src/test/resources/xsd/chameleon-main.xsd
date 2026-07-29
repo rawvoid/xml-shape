@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/chameleon"
+           targetNamespace="http://example.com/chameleon"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+    <xs:include schemaLocation="included.xsd"/>
+    <xs:element name="Wrapper">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="Shared"/>
+                <xs:element name="Local" type="SharedType"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>

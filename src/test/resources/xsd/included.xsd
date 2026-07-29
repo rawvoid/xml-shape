@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- No targetNamespace: chameleon include -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+    <xs:element name="Shared" type="xs:string"/>
+    <xs:complexType name="SharedType">
+        <xs:sequence>
+            <xs:element name="SharedChild" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>

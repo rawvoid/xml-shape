@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/bin"
+           targetNamespace="http://example.com/bin"
+           elementFormDefault="qualified">
+
+    <xs:element name="Root">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="HexTwo" type="HexTwoType"/>
+                <xs:element name="B64Three" type="B64ThreeType"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:simpleType name="HexTwoType">
+        <xs:restriction base="xs:hexBinary">
+            <xs:length value="2"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="B64ThreeType">
+        <xs:restriction base="xs:base64Binary">
+            <xs:length value="3"/>
+        </xs:restriction>
+    </xs:simpleType>
+</xs:schema>

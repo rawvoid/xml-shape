@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/basic"
+           targetNamespace="http://example.com/basic"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+    <xs:element name="Root">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="Required" type="xs:string"/>
+                <xs:element name="Optional" type="xs:string" minOccurs="0"/>
+                <xs:element name="Repeating" type="xs:string" maxOccurs="unbounded"/>
+                <xs:element name="ChoiceBox">
+                    <xs:complexType>
+                        <xs:choice>
+                            <xs:element name="BranchA" type="xs:string"/>
+                            <xs:element name="BranchB" type="xs:string"/>
+                        </xs:choice>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="Amount" type="AmountType"/>
+                <xs:element name="Status" type="StatusType"/>
+                <xs:element name="Extended" type="ExtendedType"/>
+            </xs:sequence>
+            <xs:attribute name="id" type="xs:ID" use="required"/>
+            <xs:attribute name="flag" type="xs:boolean" use="optional"/>
+            <xs:attribute name="env" type="xs:string" default="prod"/>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="AmountType">
+        <xs:simpleContent>
+            <xs:extension base="xs:decimal">
+                <xs:attribute name="currency" type="xs:string" use="required"/>
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
+
+    <xs:simpleType name="StatusType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="OPEN"/>
+            <xs:enumeration value="CLOSED"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="BaseType">
+        <xs:sequence>
+            <xs:element name="BaseField" type="xs:string"/>
+        </xs:sequence>
+        <xs:attribute name="baseAttr" type="xs:string" use="optional"/>
+    </xs:complexType>
+
+    <xs:complexType name="ExtendedType">
+        <xs:complexContent>
+            <xs:extension base="BaseType">
+                <xs:sequence>
+                    <xs:element name="ExtraField" type="xs:string"/>
+                </xs:sequence>
+                <xs:attribute name="extraAttr" type="xs:int" use="required"/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+</xs:schema>

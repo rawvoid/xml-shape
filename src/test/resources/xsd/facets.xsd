@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/facets"
+           targetNamespace="http://example.com/facets"
+           elementFormDefault="qualified">
+
+    <xs:element name="Root">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="Code" type="CodeType"/>
+                <xs:element name="Short" type="ShortType"/>
+                <xs:element name="MinTen" type="MinTenType"/>
+                <xs:element name="Bounded" type="BoundedInt"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:simpleType name="CodeType">
+        <xs:restriction base="xs:string">
+            <xs:length value="3"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="ShortType">
+        <xs:restriction base="xs:string">
+            <xs:maxLength value="2"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="MinTenType">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="10"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="BoundedInt">
+        <xs:restriction base="xs:integer">
+            <xs:minInclusive value="5"/>
+            <xs:maxInclusive value="9"/>
+        </xs:restriction>
+    </xs:simpleType>
+</xs:schema>
