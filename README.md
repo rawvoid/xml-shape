@@ -45,7 +45,7 @@ Loading a Schema from a `URI` is also supported (`include`/`import` relative pat
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| `choiceStrategy` | `ALL` | How to expand `xs:choice` and **abstract substitution groups**: `ALL` emits every alternative; `FIRST` takes the first branch (or first concrete substitution member) that would actually be generated, in schema order |
+| `choiceStrategy` | `ALL` | How to expand `xs:choice` and **abstract substitution groups**: `ALL` emits every alternative; `FIRST` takes the first branch (or first concrete substitution member) that would actually be generated, in schema order. Abstract heads are never emitted; if an abstract particle has no concrete members it is skipped |
 | `includeOptionalElements` | `true` | Whether to emit particles with `minOccurs=0` |
 | `includeOptionalAttributes` | `true` | Whether to emit non-required attributes |
 | `repeatingParticleCount` | `1` | How many times to repeat when `maxOccurs > 1` (or unbounded); never exceeds `maxOccurs` |
@@ -58,6 +58,7 @@ Loading a Schema from a `URI` is also supported (`include`/`import` relative pat
 - **Namespaces**: Follow the Schema’s `elementFormDefault` / `attributeFormDefault` and chameleon-include resolution.
 - **Sample values**: Built-in types and common facets (enumeration, length, numeric bounds, `totalDigits` / `fractionDigits`, etc.); values are **not** synthesized from arbitrary `pattern`s. `ID` / `IDREF` are bound to each other when possible.
 - **`ChoiceStrategy.ALL`**: Useful for surveying every branch; the instance typically will not pass schema validation.
+- **Abstract elements**: Expanded only through concrete substitution-group members. The abstract head is never written; particles with no concrete members are omitted (they cannot appear in a legal instance).
 
 Load failures or a missing root element throw `XsdXmlGenerationException`.
 

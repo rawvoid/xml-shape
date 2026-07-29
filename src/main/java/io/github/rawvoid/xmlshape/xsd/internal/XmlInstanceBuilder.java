@@ -268,15 +268,12 @@ public final class XmlInstanceBuilder {
 
     private void emitElementDeclaration(XSElementDeclaration declaration, Element parent) {
         if (declaration.getAbstract()) {
-            List<XSElementDeclaration> members = resolveSubstitutionMembers(declaration);
-            if (!members.isEmpty()) {
-                for (XSElementDeclaration member : members) {
-                    appendElement(member, parent);
-                }
-                return;
+            // Abstract element names never appear in instances; only concrete substitution members do.
+            // No members → skip (the particle is uninstantiable under this schema).
+            for (XSElementDeclaration member : resolveSubstitutionMembers(declaration)) {
+                appendElement(member, parent);
             }
-            // No concrete substitutes: still emit the head by type for structural templates
-            // (instance is not schema-valid for an abstract element name).
+            return;
         }
         appendElement(declaration, parent);
     }
@@ -288,7 +285,7 @@ public final class XmlInstanceBuilder {
     }
 
     /**
-     * Concrete substitution-group members for an abstract head (never includes the abstract head itself).
+     * Concrete substitution-group members for an abstract head (never includes the head itself).
      * {@link ChoiceStrategy#FIRST} keeps only the first member; {@link ChoiceStrategy#ALL} keeps all.
      */
     private List<XSElementDeclaration> resolveSubstitutionMembers(XSElementDeclaration head) {

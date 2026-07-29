@@ -23,8 +23,9 @@ import java.nio.file.Path;
  * namespaces follow the schema ({@code elementFormDefault} / {@code attributeFormDefault},
  * including chameleon includes). Abstract element particles expand via their
  * substitution group ({@link ChoiceStrategy#ALL} emits every concrete member;
- * {@link ChoiceStrategy#FIRST} emits the first). {@code xs:any}/{@code anyAttribute}
- * are skipped unless {@link GenerateOptions#emitWildcardPlaceholders()} is enabled.
+ * {@link ChoiceStrategy#FIRST} emits the first); with no concrete members the particle
+ * is skipped. {@code xs:any}/{@code anyAttribute} are skipped unless
+ * {@link GenerateOptions#emitWildcardPlaceholders()} is enabled.
  *
  * <p>Output is a structural template expanded in full. Recursion is stopped only when the
  * same type already appears on the ancestor stack (that element is emitted as a shell with

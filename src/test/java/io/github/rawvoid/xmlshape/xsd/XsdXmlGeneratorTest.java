@@ -274,6 +274,19 @@ class XsdXmlGeneratorTest {
     }
 
     @Test
+    void skipsAbstractElementsWithoutSubstitutionMembers() throws Exception {
+        Path schema = resource("xsd/abstract-no-subst.xsd");
+        String ns = "http://example.com/abstract-no-subst";
+
+        Document doc = parse(XsdXmlGenerator.generate(schema, "Root"));
+        Element root = doc.getDocumentElement();
+
+        assertEquals(0, root.getElementsByTagNameNS(ns, "OrphanAbstract").getLength());
+        assertNotNull(child(root, "Concrete"));
+        assertEquals("string", text(child(root, "Concrete")));
+    }
+
+    @Test
     void airShoppingRsIntegration() throws Exception {
         Path schema = resource("schemas/AirShoppingRS.xsd");
         String xml = XsdXmlGenerator.generate(schema, "AirShoppingRS");

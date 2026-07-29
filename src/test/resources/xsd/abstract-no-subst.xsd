@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://example.com/abstract-no-subst"
+           targetNamespace="http://example.com/abstract-no-subst"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+    <xs:element name="Root">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="OrphanAbstract"/>
+                <xs:element name="Concrete" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Abstract with no substitution members: cannot appear in instances. -->
+    <xs:element name="OrphanAbstract" type="xs:string" abstract="true"/>
+</xs:schema>

@@ -7,7 +7,8 @@ package io.github.rawvoid.xmlshape.xsd;
  * <ul>
  *   <li>{@code xs:choice} model groups</li>
  *   <li>abstract element particles resolved via their substitution group
- *       (concrete members only; the abstract head is not emitted when members exist)</li>
+ *       (concrete members only; the abstract head is never emitted, and particles with
+ *       no concrete members are skipped)</li>
  * </ul>
  */
 public enum ChoiceStrategy {
