@@ -367,6 +367,16 @@ class XmlComparerTest {
     }
 
     @Test
+    void durationValueEqualityMatchesEquivalentIsoDurations() {
+        var options = CompareOptions.defaults().withValueEquality(ValueEqualities.duration());
+        assertTrue(XmlComparer.compare("<Root>P1D</Root>", "<Root>PT24H</Root>", options).isEqual());
+        assertTrue(XmlComparer.compare("<Root>PT1H30M</Root>", "<Root>PT90M</Root>", options).isEqual());
+        assertFalse(XmlComparer.compare("<Root>P1D</Root>", "<Root>P2D</Root>", options).isEqual());
+        // Year/month forms are not Duration-parseable → fall back to literal
+        assertFalse(XmlComparer.compare("<Root>P1Y</Root>", "<Root>P12M</Root>", options).isEqual());
+    }
+
+    @Test
     void boolValueEquality() {
         var options = CompareOptions.defaults().withValueEquality(ValueEqualities.bool());
         assertTrue(XmlComparer.compare("<Root>true</Root>", "<Root>1</Root>", options).isEqual());
@@ -393,8 +403,8 @@ class XmlComparerTest {
     void commonTypesSmoke() {
         var options = CompareOptions.defaults().withValueEquality(ValueEqualities.commonTypes());
         assertTrue(XmlComparer.compare(
-                "<Root><N>10</N><T>2020-01-01T00:00:00Z</T><B>true</B></Root>",
-                "<Root><N>10.0</N><T>2020-01-01T08:00:00+08:00</T><B>1</B></Root>",
+                "<Root><N>10</N><T>2020-01-01T00:00:00Z</T><D>P1D</D><B>true</B></Root>",
+                "<Root><N>10.0</N><T>2020-01-01T08:00:00+08:00</T><D>PT24H</D><B>1</B></Root>",
                 options).isEqual());
     }
 

@@ -1,6 +1,7 @@
 package io.github.rawvoid.xmlshape.compare;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -110,6 +111,25 @@ public final class ValueEqualities {
     }
 
     /**
+     * Both sides parse as ISO-8601 {@link Duration} (e.g. {@code P1D}, {@code PT24H}) → equal when
+     * the durations match; otherwise empty.
+     *
+     * <p>Uses {@link Duration#parse}; day-based and time-based forms that resolve to the same
+     * length are equal ({@code P1D} ≡ {@code PT24H}). Year/month-based forms are not supported by
+     * {@link Duration} and fall through to literal equality.
+     */
+    public static ValueEquality duration() {
+        return (ctx, expected, actual) -> {
+            var left = tryDuration(expected);
+            var right = tryDuration(actual);
+            if (left.isEmpty() || right.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(left.get().equals(right.get()));
+        };
+    }
+
+    /**
      * Both sides look like booleans ({@code true}/{@code false}/{@code 1}/{@code 0}, case-insensitive)
      * → semantic equality; otherwise empty.
      */
@@ -149,11 +169,11 @@ public final class ValueEqualities {
     }
 
     /**
-     * Common typed chain: date-time, then numeric, then boolean. Not applied by
+     * Common typed chain: date-time, duration, numeric, then boolean. Not applied by
      * {@link CompareOptions#defaults()}; opt in explicitly.
      */
     public static ValueEquality commonTypes() {
-        return chain(dateTime(), numeric(), bool());
+        return chain(dateTime(), duration(), numeric(), bool());
     }
 
     private static Optional<BigDecimal> tryBigDecimal(String raw) {
@@ -177,6 +197,17 @@ public final class ValueEqualities {
             case "false", "0" -> Optional.of(false);
             default -> Optional.empty();
         };
+    }
+
+    private static Optional<Duration> tryDuration(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Duration.parse(raw.trim()));
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
     }
 
     /**
