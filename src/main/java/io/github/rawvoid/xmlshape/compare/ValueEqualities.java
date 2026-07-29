@@ -169,16 +169,11 @@ public final class ValueEqualities {
     }
 
     /**
-     * Common typed chain: date-time (ignore time zone), duration, numeric, then boolean.
-     * Not applied by {@link CompareOptions#defaults()}; opt in explicitly.
-     *
-     * <p>Date-time uses {@link #dateTime(boolean) dateTime(true)} so wall-clock fields are
-     * compared without offset conversion. Use {@link #dateTime()} or
-     * {@link #dateTime(boolean) dateTime(false)} in a custom {@link #chain} when Instant-style
-     * equality is required.
+     * Common typed chain: date-time, duration, numeric, then boolean. Not applied by
+     * {@link CompareOptions#defaults()}; opt in explicitly.
      */
     public static ValueEquality commonTypes() {
-        return chain(dateTime(true), duration(), numeric(), bool());
+        return chain(dateTime(), duration(), numeric(), bool());
     }
 
     private static Optional<BigDecimal> tryBigDecimal(String raw) {

@@ -402,15 +402,9 @@ class XmlComparerTest {
     @Test
     void commonTypesSmoke() {
         var options = CompareOptions.defaults().withValueEquality(ValueEqualities.commonTypes());
-        // dateTime(true): wall-clock match with different offsets; duration / numeric / bool also typed
         assertTrue(XmlComparer.compare(
                 "<Root><N>10</N><T>2020-01-01T00:00:00Z</T><D>P1D</D><B>true</B></Root>",
-                "<Root><N>10.0</N><T>2020-01-01T00:00:00+08:00</T><D>PT24H</D><B>1</B></Root>",
-                options).isEqual());
-        // same Instant, different local fields → not equal under ignore-zone commonTypes
-        assertFalse(XmlComparer.compare(
-                "<Root>2020-01-01T00:00:00Z</Root>",
-                "<Root>2020-01-01T08:00:00+08:00</Root>",
+                "<Root><N>10.0</N><T>2020-01-01T08:00:00+08:00</T><D>PT24H</D><B>1</B></Root>",
                 options).isEqual());
     }
 
