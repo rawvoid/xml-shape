@@ -7,8 +7,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
-import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAccessor;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
@@ -73,20 +74,21 @@ public final class ValueEqualities {
     /**
      * Both sides parse as the same temporal kind (ISO-8601) → equal when values match.
      *
-     * <p>Parsing tries, in order: {@link OffsetDateTime}, {@link Instant}, {@link LocalDateTime},
-     * {@link LocalDate}, {@link OffsetTime}, {@link LocalTime}.
+     * <p>Parsing uses ISO formatters in order: {@link DateTimeFormatter#ISO_DATE_TIME}
+     * ({@link OffsetDateTime} or {@link LocalDateTime}), {@link DateTimeFormatter#ISO_DATE},
+     * {@link DateTimeFormatter#ISO_TIME} ({@link OffsetTime} or {@link LocalTime}).
      *
      * <ul>
      *   <li>{@code ignoreTimeZone=false} (default):
      *     <ul>
-     *       <li>{@link Instant} / {@link OffsetDateTime} → compared as {@link Instant}</li>
+     *       <li>{@link OffsetDateTime} → compared as {@link Instant}</li>
      *       <li>{@link OffsetTime} → {@link OffsetTime#equals}</li>
      *       <li>both {@link LocalDateTime} / {@link LocalDate} / {@link LocalTime} → kind equals</li>
      *     </ul>
      *   </li>
      *   <li>{@code ignoreTimeZone=true}:
      *     <ul>
-     *       <li>zoned date-times ({@link Instant} as UTC, {@link OffsetDateTime}) → local date-time fields only</li>
+     *       <li>zoned date-times ({@link OffsetDateTime}) → local date-time fields only</li>
      *       <li>zoned times ({@link OffsetTime}) → local time fields only</li>
      *       <li>then same-kind equals as above</li>
      *     </ul>
@@ -178,9 +180,10 @@ public final class ValueEqualities {
     }
 
     /**
-     * ISO-8601 lexical forms only. {@link OffsetDateTime} is tried before {@link Instant} so that
-     * offset-bearing strings keep their wall-clock fields when {@code ignoreTimeZone} is true
-     * ({@code Instant.parse} would normalize them to UTC first).
+     * ISO-8601 lexical forms via {@link DateTimeFormatter#ISO_DATE_TIME},
+     * {@link DateTimeFormatter#ISO_DATE}, and {@link DateTimeFormatter#ISO_TIME}.
+     * Offset-optional forms use {@link DateTimeFormatter#parseBest} so plain local
+     * date-times/times still resolve when no zone is present.
      */
     private static Optional<TemporalValue> tryTemporal(String raw, boolean ignoreTimeZone) {
         if (raw == null || raw.isBlank()) {
@@ -189,45 +192,34 @@ public final class ValueEqualities {
         String s = raw.trim();
 
         try {
-            var odt = OffsetDateTime.parse(s);
-            if (ignoreTimeZone) {
-                return Optional.of(new TemporalValue.LocalDateTimeValue(odt.toLocalDateTime()));
+            TemporalAccessor best = DateTimeFormatter.ISO_DATE_TIME.parseBest(
+                    s, OffsetDateTime::from, LocalDateTime::from);
+            if (best instanceof OffsetDateTime odt) {
+                if (ignoreTimeZone) {
+                    return Optional.of(new TemporalValue.LocalDateTimeValue(odt.toLocalDateTime()));
+                }
+                return Optional.of(new TemporalValue.InstantValue(odt.toInstant()));
             }
-            return Optional.of(new TemporalValue.InstantValue(odt.toInstant()));
+            return Optional.of(new TemporalValue.LocalDateTimeValue((LocalDateTime) best));
         } catch (DateTimeParseException ignored) {
             // try next
         }
         try {
-            var instant = Instant.parse(s);
-            if (ignoreTimeZone) {
-                return Optional.of(new TemporalValue.LocalDateTimeValue(
-                        LocalDateTime.ofInstant(instant, ZoneOffset.UTC)));
+            return Optional.of(new TemporalValue.LocalDateValue(
+                    LocalDate.parse(s, DateTimeFormatter.ISO_DATE)));
+        } catch (DateTimeParseException ignored) {
+            // try next
+        }
+        try {
+            TemporalAccessor best = DateTimeFormatter.ISO_TIME.parseBest(
+                    s, OffsetTime::from, LocalTime::from);
+            if (best instanceof OffsetTime ot) {
+                if (ignoreTimeZone) {
+                    return Optional.of(new TemporalValue.LocalTimeValue(ot.toLocalTime()));
+                }
+                return Optional.of(new TemporalValue.OffsetTimeValue(ot));
             }
-            return Optional.of(new TemporalValue.InstantValue(instant));
-        } catch (DateTimeParseException ignored) {
-            // try next
-        }
-        try {
-            return Optional.of(new TemporalValue.LocalDateTimeValue(LocalDateTime.parse(s)));
-        } catch (DateTimeParseException ignored) {
-            // try next
-        }
-        try {
-            return Optional.of(new TemporalValue.LocalDateValue(LocalDate.parse(s)));
-        } catch (DateTimeParseException ignored) {
-            // try next
-        }
-        try {
-            var ot = OffsetTime.parse(s);
-            if (ignoreTimeZone) {
-                return Optional.of(new TemporalValue.LocalTimeValue(ot.toLocalTime()));
-            }
-            return Optional.of(new TemporalValue.OffsetTimeValue(ot));
-        } catch (DateTimeParseException ignored) {
-            // try next
-        }
-        try {
-            return Optional.of(new TemporalValue.LocalTimeValue(LocalTime.parse(s)));
+            return Optional.of(new TemporalValue.LocalTimeValue((LocalTime) best));
         } catch (DateTimeParseException ignored) {
             return Optional.empty();
         }
