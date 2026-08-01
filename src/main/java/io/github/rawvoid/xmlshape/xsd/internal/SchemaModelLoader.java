@@ -2,7 +2,12 @@ package io.github.rawvoid.xmlshape.xsd.internal;
 
 import io.github.rawvoid.xmlshape.xsd.XsdXmlGenerationException;
 import org.apache.xerces.impl.xs.XMLSchemaLoader;
+import org.apache.xerces.xni.XMLResourceIdentifier;
+import org.apache.xerces.xni.XNIException;
+import org.apache.xerces.xni.grammars.XMLGrammarDescription;
+import org.apache.xerces.xni.parser.XMLEntityResolver;
 import org.apache.xerces.xni.parser.XMLErrorHandler;
+import org.apache.xerces.xni.parser.XMLInputSource;
 import org.apache.xerces.xni.parser.XMLParseException;
 import org.apache.xerces.xs.XSConstants;
 import org.apache.xerces.xs.XSElementDeclaration;
@@ -10,6 +15,8 @@ import org.apache.xerces.xs.XSModel;
 import org.apache.xerces.xs.XSNamedMap;
 import org.apache.xerces.xs.XSObject;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +25,10 @@ import java.util.List;
 
 /**
  * Loads an XSD into a Xerces {@link XSModel} and resolves global element declarations.
+ *
+ * <p>External DTDs referenced by schema documents (e.g. W3C {@code XMLSchema.dtd} on
+ * official xmldsig) are not fetched: the component model comes from the XSD body, and
+ * network-dependent DTD resolution makes offline / flaky networks fail intermittently.
  */
 public final class SchemaModelLoader {
     private SchemaModelLoader() {
@@ -31,6 +42,7 @@ public final class SchemaModelLoader {
             var loader = new XMLSchemaLoader();
             var errors = new CollectingErrorHandler();
             loader.setErrorHandler(errors);
+            loader.setEntityResolver(SuppressExternalDtdResolver.INSTANCE);
             var model = loader.loadURI(schemaUri.toString());
             errors.throwIfFailed("Failed to load schema: " + schemaUri);
             if (model == null) {
@@ -107,6 +119,29 @@ public final class SchemaModelLoader {
         throw new XsdXmlGenerationException(
                 "Ambiguous global element '" + localName + "' in namespaces " + namespaces
                         + "; pass rootNamespace to disambiguate");
+    }
+
+    /**
+     * Returns an empty input for external DTD subset resolution so Xerces does not
+     * contact the network. Schema {@code import}/{@code include} still use default resolution.
+     */
+    private static final class SuppressExternalDtdResolver implements XMLEntityResolver {
+        static final SuppressExternalDtdResolver INSTANCE = new SuppressExternalDtdResolver();
+
+        @Override
+        public XMLInputSource resolveEntity(XMLResourceIdentifier resourceIdentifier)
+                throws XNIException, IOException {
+            if (resourceIdentifier instanceof XMLGrammarDescription description
+                    && XMLGrammarDescription.XML_DTD.equals(description.getGrammarType())) {
+                return new XMLInputSource(
+                        resourceIdentifier.getPublicId(),
+                        resourceIdentifier.getLiteralSystemId(),
+                        resourceIdentifier.getBaseSystemId(),
+                        new StringReader(""),
+                        null);
+            }
+            return null;
+        }
     }
 
     /**

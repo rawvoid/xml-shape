@@ -311,6 +311,29 @@ class XsdXmlGeneratorTest {
                 || root.getAttributeNode("Version").getNamespaceURI().isEmpty());
     }
 
+    /**
+     * Official xmldsig carries a DOCTYPE with an external DTD. Loading must not depend on
+     * fetching that DTD; imported types such as SignatureType must still resolve offline.
+     */
+    @Test
+    void loadsImportOfSchemaWithUnreachableExternalDtd() throws Exception {
+        Path schema = resource("xsd/import-xmldsig-with-dtd.xsd");
+        String ns = "http://example.com/signed";
+        String dsigNs = "http://www.w3.org/2000/09/xmldsig#";
+
+        Document doc = parse(XsdXmlGenerator.generate(schema, "Envelope", ns, GenerateOptions.defaults()));
+        Element root = doc.getDocumentElement();
+
+        assertEquals("Envelope", root.getLocalName());
+        assertEquals(ns, root.getNamespaceURI());
+        assertNotNull(child(root, "Payload"));
+        Element sig = child(root, "Sig");
+        assertNotNull(sig);
+        // SignatureType content is in the dsig default namespace of the imported schema.
+        assertTrue(sig.getElementsByTagNameNS(dsigNs, "SignatureValue").getLength() >= 1
+                || sig.getElementsByTagNameNS("*", "SignatureValue").getLength() >= 1);
+    }
+
     private static Path resource(String name) {
         try {
             var url = XsdXmlGeneratorTest.class.getClassLoader().getResource(name);
